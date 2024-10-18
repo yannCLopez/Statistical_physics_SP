@@ -57,7 +57,7 @@ def compute_P_K_precise_log_spaced(n, m, x, k_max, base=1.1, tol=mp.mpf('1e-12')
     for i, k in enumerate(k_values[:-1]):
         k_next = k_values[i+1]
         P_K[k] = F[k] - F[k_next]
-    P_K[k_values[-1]] = F[k_values[-1]] - rho
+    P_K[k_values[-1]] = F[k_values[-1]] - F[k_values[-1]]
 
     return P_K
 
