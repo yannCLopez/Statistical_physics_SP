@@ -14,8 +14,8 @@ p = {2: mp.mpf('0.5'), 3: mp.mpf('0.5')}  # Example distribution for m
 q = {2: mp.mpf('0.5'), 3: mp.mpf('0.5')}  # Example distribution for n
 p = {1: mp.mpf('0.1'), 2: mp.mpf('0.3'), 3: mp.mpf('0.6')}
 q = {1: mp.mpf('0.4'), 3: mp.mpf('0.3'), 5: mp.mpf('0.3')}
-#p = {1: mp.mpf('0.25'), 2: mp.mpf('0.25'), 3: mp.mpf('0.5')}
-#q = {2: mp.mpf('0.7'), 4: mp.mpf('0.3')}
+p = {1: mp.mpf('0.25'), 2: mp.mpf('0.25'), 3: mp.mpf('0.5')}
+q = {2: mp.mpf('0.7'), 4: mp.mpf('0.3')}
 
 def generate_generating_function(distribution):
     """
@@ -68,7 +68,7 @@ def compute_P_K_precise_log_spaced(x, k_max, base=1.1, tol=mp.mpf('1e-12')):
     for i, k in enumerate(k_values[:-1]):
         k_next = k_values[i+1]
         P_K[k] = F[k] - F[k_next]
-    P_K[k_values[-1]] = F[k_values[-1]] - rho
+    P_K[k_values[-1]] = F[k_values[-1]] - F[k_values[-1]]
 
     return P_K
 
