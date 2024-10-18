@@ -3,3 +3,5 @@
 
 
 *generate_data_log_spacing*: Script for special, deterministic setting
+
+You will find a few output files in the corresponding folders
