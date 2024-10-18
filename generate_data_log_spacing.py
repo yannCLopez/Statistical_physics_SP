@@ -44,7 +44,7 @@ def compute_P_K_precise_log_spaced(n, m, x, k_max, base=1.1, tol=mp.mpf('1e-12')
     # Step 3: Compute F(k) for the selected k values
     F = {0: mp.mpf(1.0)}  # F(0) = 1
     for k in k_values[1:]:
-        Fk = (1 - (1 - x * F[k_values[k_values.index(k)-1]])**n)**m
+        Fk = (1 - (1 - x * F[k_values[k_values.index(k)-1]])**n)**m #k_values[k_values.index(k)-1] gets the previous k value in our logarithmically spaced list.
         F[k] = Fk
         # Early stopping if Fk converges to rho(x)
         if abs(Fk - rho) < tol:
@@ -82,7 +82,7 @@ def compute_critical_values(m, n, precision=50):
 
 # Example usage
 n = 2              # Number of children per input type
-m = 2              # Number of input types
+m = 3              # Number of input types
 r_crit, x_crit = compute_critical_values(m, n)
 
 print(f"For m = {m} and n = {n}:")
@@ -103,12 +103,18 @@ total_finite_sum = sum(P_K_precise_log_spaced.values())
 # Normalize P(K = k) by the total finite sum
 P_K_conditional_log_spaced = {k: P_K_precise_log_spaced[k] / total_finite_sum for k in P_K_precise_log_spaced}
 
+def mpf_to_str(value):
+    """Convert mpf object to string representation."""
+    return str(value)
+
 # Save the output in a file with the value of x in the file name
-output_file = f"/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains/P_K_log_spaced_{str(x)}.txt"
+folder_path = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains"
+output_file = f"{folder_path}/P_K_log_spaced_m{m}_n{n}_x{mpf_to_str(x)}.txt"
+
+# Save the output
 with open(output_file, 'w') as file:
-    for k, p in P_K_conditional_log_spaced.items():
-        file.write(f"{k}\t{p}\n")
-print(f"Output saved in file: {output_file}")
+    for k, prob in P_K_conditional_log_spaced.items():
+        file.write(f"{k}\t{mpf_to_str(prob)}\n")
 
 # Prepare data for log-log plotting
 k_values_precise = np.array(list(P_K_conditional_log_spaced.keys()))
