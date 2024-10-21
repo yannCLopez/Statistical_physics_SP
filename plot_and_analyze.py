@@ -69,7 +69,7 @@ def display_file_options(files):
     print("Available data files:")
     for i, file in enumerate(files, 1):
         print(f"{i}. {file}")
-        print(f"   {parse_filename(file)}")
+    #    print(f"   {parse_filename(file)}")
     print()
 
 def get_user_choice(files):
