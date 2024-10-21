@@ -21,18 +21,8 @@ def compute_rho_precise(n, m, x, tol=mp.mpf('1e-12'), max_iter=1000000):
 
 def compute_P_K_precise_log_spaced(n, m, x, k_max, base=1.1, tol=mp.mpf('1e-12')):
     """
-    Compute the probability distribution P(K = k) for logarithmically spaced k values.
-
-    Args:
-        n (int): Number of children per input type.
-        m (int): Number of input types.
-        x (mp.mpf): High precision probability that an edge is operational.
-        k_max (int): Maximum value of k to compute P(K = k).
-        base (float): Base for logarithmic spacing.
-        tol (mp.mpf): Tolerance for convergence.
-
-    Returns:
-        dict: A dictionary where keys are integers k and values are P(K = k).
+    Compute the probability distribution P(K = k) for logarithmically spaced k values,
+    but compute F[k] for all k up to k_max.
     """
     # Step 1: Compute rho(x) with high precision
     rho = compute_rho_precise(n, m, x, tol=tol)
@@ -41,23 +31,24 @@ def compute_P_K_precise_log_spaced(n, m, x, k_max, base=1.1, tol=mp.mpf('1e-12')
     k_values = [0] + [int(base**i) for i in range(int(np.log(k_max) / np.log(base)) + 1)]
     k_values = sorted(list(set(k_values)))  # Remove duplicates and sort
 
-    # Step 3: Compute F(k) for the selected k values
+    # Step 3: Compute F(k) for all k up to k_max
     F = {0: mp.mpf(1.0)}  # F(0) = 1
-    for k in k_values[1:]:
-        Fk = (1 - (1 - x * F[k_values[k_values.index(k)-1]])**n)**m #k_values[k_values.index(k)-1] gets the previous k value in our logarithmically spaced list.
+    for k in range(1, k_max + 1):
+        Fk = (1 - (1 - x * F[k-1])**n)**m
         F[k] = Fk
         # Early stopping if Fk converges to rho(x)
         if abs(Fk - rho) < tol:
-            for remaining_k in k_values[k_values.index(k)+1:]:
-                F[remaining_k] = rho
+            k_max = k
             break
 
-    # Step 4: Compute P(K = k) = F(k) - F(k_next) for the selected k values
+    # Step 4: Compute P(K = k) = F(k) - F(k+1) for the logarithmically spaced k values
     P_K = {}
-    for i, k in enumerate(k_values[:-1]):
-        k_next = k_values[i+1]
-        P_K[k] = F[k] - F[k_next]
-    P_K[k_values[-1]] = F[k_values[-1]] - F[k_values[-1]]
+    for k in k_values:
+        if k < k_max:
+            P_K[k] = F[k] - F[k+1]
+        else:
+            P_K[k] = 0
+            break
 
     return P_K
 
@@ -82,7 +73,7 @@ def compute_critical_values(m, n, precision=50):
 
 # Example usage
 n = 2              # Number of children per input type
-m = 3              # Number of input types
+m = 4              # Number of input types
 r_crit, x_crit = compute_critical_values(m, n)
 
 print(f"For m = {m} and n = {n}:")
@@ -108,7 +99,7 @@ def mpf_to_str(value):
     return str(value)
 
 # Save the output in a file with the value of x in the file name
-folder_path = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains"
+folder_path = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains/Ben's code/Statistical_physics_SP/"  # Update this path
 output_file = f"{folder_path}/P_K_log_spaced_m{m}_n{n}_x{mpf_to_str(x)}.txt"
 
 # Save the output
