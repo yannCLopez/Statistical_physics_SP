@@ -4,6 +4,7 @@ import mpmath as mp
 from scipy.stats import linregress
 from scipy.optimize import minimize_scalar
 import json
+import os
 
 # Set precision for mpmath
 mp.dps = 50  # Set the decimal precision to 50 digits
@@ -12,10 +13,13 @@ mp.dps = 50  # Set the decimal precision to 50 digits
 
 p = {2: mp.mpf('0.5'), 3: mp.mpf('0.5')}  # Example distribution for m
 q = {2: mp.mpf('0.5'), 3: mp.mpf('0.5')}  # Example distribution for n
-p = {1: mp.mpf('0.1'), 2: mp.mpf('0.3'), 3: mp.mpf('0.6')}
-q = {1: mp.mpf('0.4'), 3: mp.mpf('0.3'), 5: mp.mpf('0.3')}
-p = {1: mp.mpf('0.25'), 2: mp.mpf('0.25'), 3: mp.mpf('0.5')}
-q = {2: mp.mpf('0.7'), 4: mp.mpf('0.3')}
+#p = {1: mp.mpf('0.1'), 2: mp.mpf('0.3'), 3: mp.mpf('0.6')}
+#q = {1: mp.mpf('0.4'), 3: mp.mpf('0.3'), 5: mp.mpf('0.3')}
+#p = {1: mp.mpf('0.25'), 2: mp.mpf('0.25'), 3: mp.mpf('0.5')}
+#q = {2: mp.mpf('0.7'), 4: mp.mpf('0.3')}
+p = {1: mp.mpf('0.1'), 2: mp.mpf('0.25'), 3: mp.mpf('0.5'), 10: mp.mpf('0.15')}
+q = {2: mp.mpf('0.5'), 3: mp.mpf('0.3'),4: mp.mpf('0.1'), 5: mp.mpf('0.1')}
+
 
 def generate_generating_function(distribution):
     """
@@ -41,7 +45,7 @@ def compute_rho_precise(x, tol=mp.mpf('1e-12'), max_iter=1000000):
         F_prev = F_next
     return F_prev
 
-def compute_P_K_precise_log_spaced(x, k_max, base=1.1, tol=mp.mpf('1e-12')):
+def compute_P_K_precise_log_spaced(x, k_max, base=1.1, tol=mp.mpf('1e-30')):
     """
     Compute the probability distribution P(K = k) for logarithmically spaced k values.
     """
@@ -52,25 +56,25 @@ def compute_P_K_precise_log_spaced(x, k_max, base=1.1, tol=mp.mpf('1e-12')):
     k_values = [0] + [int(base**i) for i in range(int(mp.log(k_max) / mp.log(base)) + 1)]
     k_values = sorted(list(set(k_values)))  # Remove duplicates and sort
 
-    # Step 3: Compute F(k) for the selected k values
+    # Step 3: Compute F(k) for all k in the range
     F = {0: mp.mpf(1.0)}  # F(0) = 1
-    for k in k_values[1:]:
-        Fk = G_p(1 - G_q(1 - x * F[k_values[k_values.index(k)-1]])) #k_values[k_values.index(k)-1] gets the previous k value in our logarithmically spaced list.
+    for k in range(1, k_max + 1):
+        Fk = G_p(1 - G_q(1 - x * F[k-1]))
         F[k] = Fk
         # Early stopping if Fk converges to rho(x)
         if abs(Fk - rho) < tol:
-            for remaining_k in k_values[k_values.index(k)+1:]:
-                F[remaining_k] = rho
+            k_max = k
             break
+    
+    #truncate k_values to the max value of k for which F[k] is computed
+    k_values = [k for k in k_values if k <= k_max]
 
-    # Step 4: Compute P(K = k) = F(k) - F(k_next) for the selected k values
-    P_K = {}
-    for i, k in enumerate(k_values[:-1]):
-        k_next = k_values[i+1]
-        P_K[k] = F[k] - F[k_next]
-    P_K[k_values[-1]] = F[k_values[-1]] - F[k_values[-1]]
+    #Define P_K[k] for k in k_values to be F[k]-F[k+1] but check that we are in the range (1,k_max+1)
+    P_K = {k: F[k] - F[k+1] for k in k_values if 1 <= k <= k_max}
 
     return P_K
+
+
 
 def chi(r):
     """
@@ -112,7 +116,7 @@ print(f"x_crit = {mp.nstr(x_crit, 12)}")
 
 
 # Parameters for high-precision computation
-x = x_crit  # High precision value for x
+x = x_crit+.01  # High precision value for x
 k_max = 10**6  # Compute P(K=k) up to k=10^6
 base = 1.05  # Base for logarithmic spacing
 
@@ -154,7 +158,7 @@ q_string = get_distribution_string(q)
 use_option_1 = True
 use_option_2 = True
 
-folder_path = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains"
+folder_path = os.path.dirname(os.path.abspath(__file__))
 if use_option_1:
     output_file = f"{folder_path}/P_K_log_spaced_p{p_string}_q{q_string}_x{mpf_to_str(x)}.txt"
 else:
@@ -177,12 +181,17 @@ k_values_precise = np.array(list(P_K_conditional_log_spaced.keys()))
 P_K_values_precise = np.array([P_K_conditional_log_spaced[k] for k in k_values_precise])
 
 # Convert k values and P(K) values from mpmath.mpf to floats for compatibility with numpy
-k_values_filtered = np.array([float(k) for k in k_values_precise if k > 10**3])
-P_K_values_filtered = np.array([float(P_K_conditional_log_spaced[k]) for k in k_values_precise if k > 10**3])
+k_values_filtered = np.array([float(k) for k in k_values_precise if k > 1])
+P_K_values_filtered = np.array([float(P_K_conditional_log_spaced[k]) for k in k_values_precise if k > 1])
+
+# Define filtered_k and filtered_P_K using list comprehension
+filtered_k = [k for k, prob in zip(k_values_filtered, P_K_values_filtered) if not np.isnan(prob) and 0 < prob < 1]
+filtered_P_K = [prob for prob in P_K_values_filtered if not np.isnan(prob) and 0 < prob < 1]
+
 
 # Apply log transformation
-log_k = np.log(k_values_filtered)
-log_P_K = np.log(P_K_values_filtered)
+log_k = np.log(filtered_k)
+log_P_K = np.log(filtered_P_K)
 
 # Perform linear regression on the log-log data
 slope, intercept, r_value, p_value, std_err = linregress(log_k, log_P_K)
@@ -198,8 +207,8 @@ print(f"b = {b:.4f}")
 
 # Plot the filtered data and fitted line
 plt.figure(figsize=(10, 6))
-plt.loglog(k_values_filtered, P_K_values_filtered, marker='o', linestyle='', color='b', label="P(K = k)")
-plt.loglog(k_values_filtered, a / (k_values_filtered**b), linestyle='--', color='r', label=f"Fitted Power Law: a/k^b")
+plt.loglog(filtered_k, filtered_P_K, marker='o', linestyle='', color='b', label="P(K = k)")
+plt.loglog(filtered_k, a / (filtered_k**b), linestyle='--', color='r', label=f"Fitted Power Law: a/k^b")
 plt.xlabel("k")
 plt.ylabel("P(K = k)")
 plt.title("Log-Log Plot of P(K = k) with Power Law Fit (k > 10^3)")
