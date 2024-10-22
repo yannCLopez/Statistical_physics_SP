@@ -109,7 +109,7 @@ def process_data(P_K_conditional_large_k):
     k_values_filtered = []
     P_K_values_filtered = []
     for k, p in P_K_conditional_large_k.items():
-        if k > 10**3 and p > 0:
+        if k > 1 and p > 0:
             k_values_filtered.append(float(k))
             P_K_values_filtered.append(float(p))
     return np.array(k_values_filtered), np.array(P_K_values_filtered)
@@ -193,17 +193,17 @@ def upload_to_github(img_data, filename, repo_info):
 
 def main():
     parser = argparse.ArgumentParser(description="Plot statistical physics data from GitHub or local directory")
-    parser.add_argument("--repo", help="GitHub repository in the format owner/repo/folder")
+    parser.add_argument("--github", help="GitHub repository in the format owner/repo/folder")
     parser.add_argument("--local", help="Local directory path")
     parser.add_argument("--file", help="Specify the file to plot")
     parser.add_argument("--token", help="GitHub personal access token")
     args = parser.parse_args()
 
-    if args.repo:
+    if args.github:
         if not args.token:
             print("Please provide a GitHub personal access token using the --token argument")
             return
-        repo_parts = args.repo.split('/')
+        repo_parts = args.github.split('/')
         if len(repo_parts) < 2:
             print("Please provide a valid GitHub repository in the format owner/repo or owner/repo/folder")
             return
