@@ -46,14 +46,11 @@ def compute_P_K_precise_log_spaced(n, m, x, k_max, base=1.1, tol=mp.mpf('1e-12')
             k_max = k
             break
 
-    # Step 4: Compute P(K = k) = F(k) - F(k+1) for the logarithmically spaced k values
-    P_K = {}
-    for k in k_values:
-        if k < k_max:
-            P_K[k] = F[k] - F[k+1]
-        else:
-            P_K[k] = 0
-            break
+    #truncate k_values to the max value of k for which F[k] is computed
+    k_values = [k for k in k_values if k <= k_max]
+
+    #Define P_K[k] for k in k_values to be F[k]-F[k+1] but check that we are in the range (1,k_max+1)
+    P_K = {k: F[k] - F[k+1] for k in k_values if 1 <= k <= k_max}
 
     return P_K
 
@@ -153,8 +150,8 @@ def main():
         save_function = lambda content, filename: open(os.path.join(folder_path, filename), 'w').write(content)
 
     # Example usage (keeping the original values)
-    n = 3              # Number of children per input type
-    m = 3              # Number of input types
+    n = 2              # Number of children per input type
+    m = 2              # Number of input types
     r_crit, x_crit = compute_critical_values(m, n)
 
     print(f"For m = {m} and n = {n}:")
@@ -164,7 +161,7 @@ def main():
     # Parameters for high-precision computation
     x = x_crit  # High precision value for x
     k_max = 10**6  # Compute P(K=k) up to k=10^6
-    base = 1.01  # Base for logarithmic spacing
+    base = 1.05  # Base for logarithmic spacing
 
     # Compute P(K = k) with high precision and logarithmic spacing
     P_K_precise_log_spaced = compute_P_K_precise_log_spaced(n, m, x, k_max, base)
@@ -201,12 +198,17 @@ def main():
     P_K_values_precise = np.array([P_K_conditional_log_spaced[k] for k in k_values_precise])
 
     # Convert k values and P(K) values from mpmath.mpf to floats for compatibility with numpy
-    k_values_filtered = np.array([float(k) for k in k_values_precise if k > 10**3])
-    P_K_values_filtered = np.array([float(P_K_conditional_log_spaced[k]) for k in k_values_precise if k > 10**3])
+    k_values_filtered = np.array([float(k) for k in k_values_precise if k > 1])
+    P_K_values_filtered = np.array([float(P_K_conditional_log_spaced[k]) for k in k_values_precise if k > 1])
+
+    # Define filtered_k and filtered_P_K using list comprehension
+    filtered_k = [k for k, prob in zip(k_values_filtered, P_K_values_filtered) if not np.isnan(prob) and 0 < prob < 1]
+    filtered_P_K = [prob for prob in P_K_values_filtered if not np.isnan(prob) and 0 < prob < 1]
+
 
     # Apply log transformation
-    log_k = np.log(k_values_filtered)
-    log_P_K = np.log(P_K_values_filtered)
+    log_k = np.log(filtered_k)
+    log_P_K = np.log(filtered_P_K)
 
     # Perform linear regression on the log-log data
     slope, intercept, r_value, p_value, std_err = linregress(log_k, log_P_K)
@@ -222,26 +224,15 @@ def main():
 
     # Plot the filtered data and fitted line
     plt.figure(figsize=(10, 6))
-    plt.loglog(k_values_filtered, P_K_values_filtered, marker='o', linestyle='', color='b', label="P(K = k)")
-    plt.loglog(k_values_filtered, a / (k_values_filtered**b), linestyle='--', color='r', label=f"Fitted Power Law: a/k^b")
+    plt.loglog(filtered_k, filtered_P_K, marker='o', linestyle='', color='b', label="P(K = k)")
+    plt.loglog(filtered_k, a / (filtered_k**b), linestyle='--', color='r', label=f"Fitted Power Law: a/k^b")
     plt.xlabel("k")
     plt.ylabel("P(K = k)")
-    plt.title(f"Log-Log Plot of P(K = k) with Power Law Fit (k > 10^3), m={m}, n={n}")
+    plt.title("Log-Log Plot of P(K = k) with Power Law Fit (k > 10^3)")
     plt.legend()
     plt.grid(True)
-    
-    # Save the plot
-    #plot_filename = filename.rsplit('.', 1)[0] + '_plot.png'
-    #plt.savefig(plot_filename)
-    #print(f"Plot saved: {plot_filename}")
+    plt.show()
 
-    #if args.github:
-    #    with open(plot_filename, 'rb') as file:
-    #        content_base64 = base64.b64encode(content).decode('utf-8')
-    #        content = file.read()
-    #        save_to_github(content_base64, plot_filename, repo_info)
-    #else:
-    #    plt.savefig(os.path.join(folder_path, plot_filename))
 
 if __name__ == "__main__":
     main()
