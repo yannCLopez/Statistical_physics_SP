@@ -52,7 +52,7 @@ class SupplyNetwork:
         
         # Initialize ALL edges as operational (state = 1) at t=0
         for edge in self.edges:
-            self.edge_states[edge] = 1
+            self.edge_states[edge] = 1 if random.random() < x else 0
 
     def create_path_label(self, parent_id: int, type_idx: int, child_idx: int) -> str:
         #checked
@@ -98,7 +98,7 @@ class SupplyNetwork:
                         # Create node with path label
                         path_label = self.create_path_label(parent, type_idx, child_idx)
                         self.node_labels[current_id] = path_label
-                        print("dictionary: ", self.node_labels)
+                        #print("dictionary: ", self.node_labels)
                         self.label_to_id[path_label] = current_id
                         
                         # Add edge and child info
@@ -136,9 +136,11 @@ class SupplyNetwork:
         print("Network Structure:")
         print_node(0)
 
+
     def check_functionality(self) -> bool:
-        #partially checked (with AI)
-        #revoir logique
+        #Checked
+        #Check if only active when there is a change in edges
+
         """
         Note: iterations are not in time. 
         Check functionality of the network using bottom-up approach.
@@ -261,6 +263,7 @@ class SupplyNetwork:
 
 class PoissonSimulation:
     def __init__(self, network):
+        #checked
         self.network = network
         self.current_time = 0
         self.event_queue = []
@@ -273,14 +276,18 @@ class PoissonSimulation:
             self.schedule_next_event(edge)
     
     def schedule_next_event(self, edge):
+        #checked
         """Schedule the next event for an edge based on its current state"""
         current_state = self.network.edge_states[edge]
+        
         rate = self.network.lambda_on if current_state == 0 else self.network.lambda_off
         next_time = self.current_time + np.random.exponential(1/rate)
-        heapq.heappush(self.event_queue, 
+        heapq.heappush(self.event_queue,
+                       
                        Event(time=next_time, edge=edge, priority=random.random()))
     
     def run_until(self, end_time: float) -> List[Tuple[float, bool]]:
+        #checked
         """
         Run simulation until specified end time
         Returns list of root state changes
@@ -306,67 +313,150 @@ class PoissonSimulation:
             self.schedule_next_event(edge)
             
         return self.root_state_changes
-def analyze_root_state_changes(root_state_changes: List[Tuple[float, bool]]) -> dict:
+def analyze_root_state_changes(root_state_changes: List[Tuple[float, bool]], end_time: float, output_file: str = "down_times.txt") -> dict:
     """
-    Analyze the root state changes to provide useful statistics
-    """
-    if len(root_state_changes) <= 1:  # Changed from not root_state_changes
-        return {
-            "number_of_changes": 0,
-            "time_operational": root_state_changes[0][1] if root_state_changes else 0,
-            "time_non_operational": not root_state_changes[0][1] if root_state_changes else 0,
-            "average_operational_period": 0,
-            "average_non_operational_period": 0
-        }
+    Analyze the root state changes and write down-time durations to file as they occur
     
-    stats = {
+    Parameters:
+    -----------
+    root_state_changes : List[Tuple[float, bool]]
+        List of (time, state) pairs recording when root state changed
+    end_time : float
+        Total simulation time
+    output_file : str
+        Name of file to write down-time durations to
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing various statistics
+    """
+    # Open file in append mode
+    with open(output_file, 'w') as f:
+        f.write("duration\n")  # Header
+        
+        if len(root_state_changes) <= 1:
+            # If system starts non-operational, write entire time as one down period
+            if not root_state_changes[0][1]:
+                f.write(f"{end_time}\n")
+            
+            operational_time = end_time if root_state_changes[0][1] else 0
+            return {
+                "number_of_changes": 0,     
+                "time_operational": operational_time,          
+                "time_non_operational": end_time - operational_time,
+                "fraction_time_operational": operational_time / end_time if end_time > 0 else 0,
+                "average_operational_period": 0,
+                "average_non_operational_period": 0
+            }
+    
+        total_operational_time = 0
+        operational_periods = []
+        non_operational_periods = []
+        
+        # Process all periods including the final one
+        for i in range(len(root_state_changes)):
+            current_time = root_state_changes[i][0]
+            current_state = root_state_changes[i][1]
+            
+            # Get end time for this period
+            next_time = end_time if i == len(root_state_changes) - 1 else root_state_changes[i + 1][0]
+            period_duration = next_time - current_time
+            
+            if current_state:
+                total_operational_time += period_duration
+                if i < len(root_state_changes) - 1:
+                    operational_periods.append(period_duration)
+            else:
+                # Write down-time duration to file immediately
+                if i < len(root_state_changes) - 1:
+                    f.write(f"{period_duration}\n")
+                    non_operational_periods.append(period_duration)
+    
+    return {
         "number_of_changes": len(root_state_changes) - 1,
-        "state_changes": root_state_changes
+        "time_operational": total_operational_time,
+        "time_non_operational": end_time - total_operational_time,
+        "fraction_time_operational": total_operational_time / end_time if end_time > 0 else 0,
+        "average_operational_period": np.mean(operational_periods) if operational_periods else 0,
+        "average_non_operational_period": np.mean(non_operational_periods) if non_operational_periods else 0
     }
-    
-    # Calculate periods for each state
-    operational_periods = []
-    non_operational_periods = []
-    
-    for i in range(len(root_state_changes) - 1):
-        duration = root_state_changes[i + 1][0] - root_state_changes[i][0]
-        if root_state_changes[i][1]:  # If state was operational
-            operational_periods.append(duration)
-        else:
-            non_operational_periods.append(duration)
-    
-    stats["average_operational_period"] = np.mean(operational_periods) if operational_periods else 0
-    stats["average_non_operational_period"] = np.mean(non_operational_periods) if non_operational_periods else 0
-    
-    return stats
 
-def run_simulation(n, m, num_layers, x, end_time):
+
+def calculate_analytical_F(n, m, x, num_layers):
+    """
+    Calculate F(k) iteratively using the formula:
+    F(k+1) = [1 - (1 - xF(k))^n]^m
+    
+    Parameters:
+    -----------
+    n : int
+        Number of children per type
+    m : int
+        Number of types
+    x : float
+        Probability of edge being operational
+    num_layers : int
+        Number of layers (iterations)
+    
+    Returns:
+    --------
+    float
+        Final value of F after num_layers iterations
+    """
+    F = 1.0  # F(0) = 1
+    
+    for k in range(num_layers):
+        F = (1 - (1 - x*F)**n)**m
+    
+    return F
+
+def run_simulation(n, m, num_layers, x, end_time, output_file):
     network = SupplyNetwork(n=n, m=m, num_layers=num_layers, x=x)
     
     # Verify initial conditions
     print("\nInitial conditions verification:")
-    print("All edges operational:", all(state == 1 for state in network.edge_states.values()))
+    num_operational = sum(state == 1 for state in network.edge_states.values())
+    total_edges = len(network.edge_states)
+    initial_ratio = num_operational / total_edges
+    print(f"Proportion of operational edges: {initial_ratio:.3f} (expected ≈ {x:.3f})")
     
     print("\nChecking initial functionality propagation:")
     initial_functionality = network.check_functionality()
-    print(f"\nRoot functional at t=0: {initial_functionality}")
-    
-    if not initial_functionality:
-        raise AssertionError("Root must be functional at t=0 when all edges are operational")
+    print(f"Root functional at t=0: {initial_functionality}")
     
     sim = PoissonSimulation(network)
     root_state_changes = sim.run_until(end_time)
-    stats = analyze_root_state_changes(root_state_changes)
+    stats = analyze_root_state_changes(root_state_changes, end_time, output_file)
+    
+    # Calculate analytical result
+    analytical_result = calculate_analytical_F(n, m, x, num_layers)
+    
+    print("\nSimulation Results:")
+    print(f"Fraction of time root was operational: {stats['fraction_time_operational']:.3f}")
+    print(f"Analytical prediction: {analytical_result:.3f}")
+    print(f"Total operational time: {stats['time_operational']:.3f}")
+    print(f"Total non-operational time: {stats['time_non_operational']:.3f}")
+    print(f"\nDown-time durations have been written to {output_file}")
     
     return sim, root_state_changes, stats
 
+output_folder = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains/down_times_stats"
+n=2
+m=2
+num_layers=6
+x=0.843750000000043
+end_time=1000
+output_file = f"{output_folder}/down_times_n_{n}_m_{m}_layers_{num_layers}_x_{x}_end_time_{end_time}.txt"
+
 if __name__ == "__main__":
-    sim, state_changes, stats = run_simulation(n=2, m=2, num_layers=3, x=0.843750000000043, end_time=100)
-    
-    print("\nRoot state changes:")
+    sim, state_changes, stats = run_simulation(n, m, num_layers, 
+                                             x, end_time,
+                                             output_file) 
+    #print("\nRoot state changes:")
     print(f"Initial state at t=0: {'Operational' if state_changes[0][1] else 'Non-operational'}")
-    for time, state in state_changes[1:]:  # Skip initial state in the loop
-        print(f"t={time:.3f}: {'Operational' if state else 'Non-operational'}")
+    #for time, state in state_changes[1:]:  # Skip initial state in the loop
+    #    print(f"t={time:.3f}: {'Operational' if state else 'Non-operational'}") #equivalent to if state=true
     
     print("\nStatistics:")
     print(f"Number of state changes: {stats['number_of_changes']}")
