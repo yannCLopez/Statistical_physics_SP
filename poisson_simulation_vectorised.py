@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import random
 import string
 from typing import List, Tuple, Dict
-from playsound import playsound
+#from playsound import playsound
+import os
 
 
 @dataclass(order=True)
@@ -414,7 +415,7 @@ def analyze_root_state_changes(root_state_changes: List[Tuple[float, bool]], end
             if not root_state_changes[0][1]:
                 f.write(f"{end_time}\n")
             
-            operational_time = end_time if root_state_changes[0][1] else 0
+            operational_time = end_time if root_state_changes[0][1]  else 0
             return {
                 "number_of_changes": 0,     
                 "time_operational": operational_time,          
@@ -515,12 +516,13 @@ def run_simulation(n, m, num_layers, x, end_time, output_file):
     
     return sim, root_state_changes, stats
 
-output_folder = "/Users/yanncalvolopez/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Career/RA Ben/Statistical physics of supply chains/down_times_stats"
+output_folder = os.path.dirname(os.path.abspath(__file__))
 n=2
 m=2
-num_layers=5
-x=0.843750000000043
-end_time=1000
+num_layers=7
+#x=0.843750000000043
+x=.805
+end_time=100
 output_file = f"{output_folder}/down_times_n_{n}_m_{m}_layers_{num_layers}_x_{x}_end_time_{end_time}.txt"
 
 if __name__ == "__main__":
@@ -537,4 +539,4 @@ if __name__ == "__main__":
     print(f"Average operational period: {stats['average_operational_period']:.3f}")
     print(f"Average non-operational period: {stats['average_non_operational_period']:.3f}")
 
-   #playsound('/Users/yanncalvolopez/Documents/Ringtones/Impro tiersen.2.mp3')
+# playsound('/Users/yanncalvolopez/Documents/Ringtones/Impro tiersen.2.mp3')
