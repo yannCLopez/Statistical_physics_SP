@@ -15,7 +15,7 @@ class Event:
     priority: int = 0  # For tiebreaking in heapq
 
 class SupplyNetwork:
-    def _init_(self, n, m, num_layers, x):
+    def __init__(self, n, m, num_layers, x):
         """
         Initialize supply network with n children per type, m types, and specified number of layers.
         x is the desired steady-state probability of an edge being operational.
@@ -193,7 +193,7 @@ class SupplyNetwork:
                 break
 
 class PoissonSimulation:
-    def _init_(self, network):
+    def __init__(self, network):
         self.network = network
         self.current_time = 0
         self.event_queue = []
@@ -353,7 +353,7 @@ def calculate_analytical_F(n, m, x, num_layers):
     F = 1.0  # F(0) = 1
     
     for k in range(num_layers):
-        F = (1 - (1 - x*F)*n)*m
+        F = (1 - (1 - x*F)**n)**m
     
     return F
 
@@ -388,14 +388,18 @@ def run_simulation2(n, m, num_layers, x, end_time, output_file):
     return sim, root_state_changes, stats
 
 def main():
-    output_folder = os.path.dirname(os.path.abspath(_file_))
+    output_folder = os.path.dirname(os.path.abspath(__file__))
     n = 2
-    m = 2
-    num_layers = 11
+    m = 4
+    num_layers = 6
     #x=0.843750000000043
     #x = 0.79
-    x = 0.83
-    end_time = 100
+    #x = 0.904224537037
+    #x = 0.8770978009
+    #x = 0.930834734885
+    x = 0.9029096929
+
+    end_time = 500
     output_file = os.path.join(output_folder, f"down_times_n_{n}m{m}layers{num_layers}x{x}end_time{end_time}.txt")
     
     sim, state_changes, stats = run_simulation2(n, m, num_layers, x, end_time, output_file)
@@ -406,5 +410,5 @@ def main():
     print(f"Average operational period: {stats['average_operational_period']:.3f}")
     print(f"Average non-operational period: {stats['average_non_operational_period']:.3f}")
 
-if _name_ == "_main_":
+if __name__ == "__main__":    
     main()
