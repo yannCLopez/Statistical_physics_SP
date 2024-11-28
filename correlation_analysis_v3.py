@@ -1,6 +1,7 @@
 """
 This version allows you to specify the tiers from which nodes will be sampled.
 It only calculates the correlation for pairs of nodes in different tiers. 
+TO BE CHECKED THOROUGHLY
 """
 
 import numpy as np
