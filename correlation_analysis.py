@@ -14,11 +14,12 @@ class NodeCorrelationAnalyzer:
         self.sample_nodes = set()
         self.time_points = []
         
+        #c
     def get_all_nodes(self) -> Set[int]:
         """Get all node IDs in the network"""
         nodes = {0}  # Start with root
         for parent in self.network.children:
-            for type_children in self.network.children[parent].values():
+            for type_children in self.network.children[parent].values(): #self.network.children[parent].values() is accessing a nested dictionary structure from the SupplyNetwork class. In that class, children is a defaultdict where: The first level key is the parent node ID; For each parent, it contains another dictionary where keys are "type indices" and values are lists of child nodes; .values() gets all the lists of children, regardless of their type
                 nodes.update(type_children)
         return nodes
         
@@ -27,7 +28,7 @@ class NodeCorrelationAnalyzer:
         tiers = defaultdict(set)
         tiers[0].add(0)  # Root is tier 0
         
-        # BFS to assign tiers
+        # Breadth-First Search to assign tiers
         queue = [(0, 0)]  # (node, tier)
         seen = {0}
         
@@ -39,8 +40,10 @@ class NodeCorrelationAnalyzer:
                         tiers[tier + 1].add(child)
                         queue.append((child, tier + 1))
                         seen.add(child)
-                        
+        #c
+        #print(tiers)         
         return dict(tiers)
+        
     
     def sample_nodes_random(self) -> Set[int]:
         """Randomly sample nodes from the network"""
@@ -51,7 +54,7 @@ class NodeCorrelationAnalyzer:
     def sample_nodes_stratified(self) -> Set[int]:
         """Sample nodes with stratification by tier"""
         tiers = self.get_nodes_by_tier()
-        samples_per_tier = max(1, self.num_samples // len(tiers))
+        samples_per_tier = max(1, self.num_samples // len(tiers)) # // is Python's integer division operator (also called floor division). It divides and rounds down to the nearest whole number
         stratified_samples = set()
         
         for tier_nodes in tiers.values():
@@ -77,26 +80,53 @@ class NodeCorrelationAnalyzer:
     
     def calculate_correlations(self) -> Tuple[float, List[float]]:
         """Calculate average correlation between pairs of sampled nodes"""
-        # Convert node states to time series (1 for operational, 0 for non-operational)
         node_series = {}
         for node in self.sample_nodes:
             series = [1 if states[node] else 0 for states in self.node_states_history]
             node_series[node] = series
             
-        # Calculate correlations between all pairs
         correlations = []
+        skipped_pairs = 0  # Keep track of how many pairs we skip
+        
         for node1, node2 in combinations(self.sample_nodes, 2):
             series1 = node_series[node1]
             series2 = node_series[node2]
             
-            # Calculate correlation coefficient
-            correlation = np.corrcoef(series1, series2)[0, 1]
-            if not np.isnan(correlation):
-                correlations.append(correlation)
+            # Check if either series is constant
+            if len(set(series1)) == 1 and len(set(series2)) == 1:
+                state1, state2 = series1[0], series2[0]
+                print(f"Skipping correlation: both nodes {node1} and {node2} have constant values\n"
+                    f"Node {node1} is always: {'operational' if state1 == 1 else 'failed'}\n"
+                    f"Node {node2} is always: {'operational' if state2 == 1 else 'failed'}")
+                skipped_pairs += 1
+                continue
+            elif len(set(series1)) == 1:
+                state = series1[0]
+                print(f"Skipping correlation: node {node1} is always {'operational' if state == 1 else 'failed'}")
+                skipped_pairs += 1
+                continue
+            elif len(set(series2)) == 1:
+                state = series2[0]
+                print(f"Skipping correlation: node {node2} is always {'operational' if state == 1 else 'failed'}")
+                skipped_pairs += 1
+                continue
                 
-        avg_correlation = np.mean(correlations) if correlations else 0
+            correlation = np.corrcoef(series1, series2)[0, 1]
+            if np.isnan(correlation):
+                print(f"Warning: NaN correlation found between nodes {node1} and {node2}\n"
+                    f"Time series for node {node1}: {series1}\n"
+                    f"Time series for node {node2}: {series2}")
+                skipped_pairs += 1
+                continue
+            correlations.append(correlation)
+        
+        if not correlations:
+            raise ValueError(f"No correlations were calculated - all {skipped_pairs} pairs were skipped or resulted in NaN")
+            
+        print(f"Successfully calculated correlations for {len(correlations)} pairs, skipped {skipped_pairs} pairs")
+        avg_correlation = np.mean(correlations)
         return avg_correlation, correlations
-    
+        
     def run_analysis(self, end_time: float, sampling_interval: float, 
                     stratified: bool = False) -> Tuple[float, List[float]]:
         """Run full correlation analysis"""
@@ -117,13 +147,13 @@ class NodeCorrelationAnalyzer:
             current_time += sampling_interval
             
             # Run simulation until next sampling point
-            state_changes = sim.run_until(current_time)
+            sim.run_until(current_time)
             
         return self.calculate_correlations()
 
 def run_correlation_study(n: int, m: int, num_layers: int, x: float, 
-                         num_samples: int = 100, end_time: float = 10.0,
-                         sampling_interval: float = 0.1) -> dict:
+                         num_samples: int, end_time: float,
+                         sampling_interval: float) -> dict:
     """Run both random and stratified correlation analysis"""
     # Create network
     network = SupplyNetwork(n=n, m=m, num_layers=num_layers, x=x)
@@ -221,8 +251,8 @@ def create_x_values() -> np.ndarray:
     return np.sort(np.concatenate([x_coarse, x_dense, x_coarse_upper]))
 
 def run_correlation_sweep(n: int, m: int, num_layers: int, x_values: np.ndarray,
-                         num_samples: int = 100, end_time: float = 10.0,
-                         sampling_interval: float = 0.1) -> dict:
+                         num_samples: int, end_time: float,
+                         sampling_interval: float) -> dict:
     """Run correlation analysis for multiple x values"""
     random_avgs = []
     random_stds = []
@@ -270,13 +300,13 @@ def plot_correlation_sweep(results: dict, x_crit: float = None, save_path: str =
     plt.fill_between(x_values, 
                      results['random_averages'] - results['random_stds'],
                      results['random_averages'] + results['random_stds'],
-                     color='blue', alpha=0.2)
+                     color='blue', alpha=0.1)
     
     plt.plot(x_values, results['stratified_averages'], 'r-', label='Stratified Sampling', linewidth=2)
     plt.fill_between(x_values, 
                      results['stratified_averages'] - results['stratified_stds'],
                      results['stratified_averages'] + results['stratified_stds'],
-                     color='red', alpha=0.2)
+                     color='red', alpha=0.1)
     
     # Add vertical line at x_crit if provided
     if x_crit is not None:
@@ -305,7 +335,7 @@ def main():
     num_layers = 6
     x_crit = 0.843750000000043
     num_samples = 100
-    end_time = 10.0
+    end_time = 30.0
     sampling_interval = 0.1
     
     # Create x values
@@ -332,9 +362,6 @@ def main():
         'stratified_std': sweep_results['stratified_stds']
     })
     df.to_csv('correlation_sweep_results.csv', index=False)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
