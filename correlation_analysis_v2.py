@@ -1,3 +1,8 @@
+"""
+This version allows you to specify the tiers from which nodes will be sampled.
+TO BE CHECKED THOROUGHLY
+"""
+
 import numpy as np
 from itertools import combinations
 import random
